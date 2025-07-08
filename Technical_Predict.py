@@ -175,6 +175,18 @@ def main():
         st.pyplot(fig)
         plt.close()
 
+    st.header('Make New Predictions')
+    project_name = st.text_input('Enter Project Name')
+    new_data = {col: st.number_input(f'{col}', value=float(X[col].mean())) for col in X.columns}
+
+    if st.button('Predict'):
+        df_input = pd.DataFrame([new_data])
+        input_scaled = scaler.transform(df_input)
+        pred = rf_model.predict(input_scaled)[0]
+        result = {'Project Name': project_name, **new_data, target_column: round(pred, 2)}
+        st.session_state['predictions'][selected_dataset_name].append(result)
+        st.success(f"Predicted {target_column} for project '{project_name}': {round(pred, 2)}")
+
     # Updated Cost Curve section with predictions overlay
     st.subheader('📈 Cost Curve with Predictions')
     feature = st.selectbox('Cost Curve Dropdown Menu', X.columns, key='cost_curve_feature')
