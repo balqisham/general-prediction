@@ -13,7 +13,7 @@ import io
 from matplotlib.ticker import FuncFormatter
 
 st.set_page_config(
-    page_title="Cost Prediction RT2025",
+    page_title="General Predictor 2025",
     page_icon="💲",
     initial_sidebar_state="expanded"
 )
@@ -47,7 +47,7 @@ def check_password():
     return False
 
 def main():
-    st.title('💲Cost Prediction RT2025💲')
+    st.title('📈General Predictor Tool 2025📈')
 
     if 'datasets' not in st.session_state:
         st.session_state['datasets'] = {}
@@ -210,4 +210,4 @@ if __name__ == '__main__':
     if check_password():
         main()
     else:
-        st.error("Please enter the correct password to access the Cost Prediction Tool")
+        st.error("Please enter the correct password to access the General Predictor Tool 2025")
