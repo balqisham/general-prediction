@@ -53,6 +53,8 @@ def main():
         st.session_state['datasets'] = {}
     if 'predictions' not in st.session_state:
         st.session_state['predictions'] = {}
+    if 'processed_excel_files' not in st.session_state:
+        st.session_state['processed_excel_files'] = set()
 
     st.sidebar.header('Data Controls')
     if st.sidebar.button("Clear all predictions"):
@@ -173,17 +175,75 @@ def main():
         st.pyplot(fig)
         plt.close()
 
-    st.header('Make New Predictions')
-    project_name = st.text_input('Enter Project Name')
-    new_data = {col: st.number_input(f'{col}', value=float(X[col].mean())) for col in X.columns}
+    # Updated Cost Curve section with predictions overlay
+    st.subheader('📈 Cost Curve with Predictions')
+    feature = st.selectbox('Cost Curve Dropdown Menu', X.columns, key='cost_curve_feature')
 
-    if st.button('Predict'):
-        df_input = pd.DataFrame([new_data])
-        input_scaled = scaler.transform(df_input)
-        pred = rf_model.predict(input_scaled)[0]
-        result = {'Project Name': project_name, **new_data, target_column: round(pred, 2)}
-        st.session_state['predictions'][selected_dataset_name].append(result)
-        st.success(f"Predicted {target_column} for project '{project_name}': {round(pred, 2)}")
+    fig, ax = plt.subplots(figsize=(7, 6))
+
+    x_vals = df_imputed[feature].values
+    y_vals = y.values
+    mask = (x_vals > 0) & (y_vals > 0)
+
+    if mask.sum() >= 2:
+        log_x = np.log(x_vals[mask])
+        log_y = np.log(y_vals[mask])
+        slope, intercept, r_val, _, _ = linregress(log_x, log_y)
+        a = np.exp(intercept)
+        b = slope
+        sns.scatterplot(x=x_vals, y=y_vals, label='Original Data', ax=ax)
+        x_line = np.linspace(min(x_vals[mask]), max(x_vals[mask]), 100)
+        y_line = a * (x_line ** b)
+        ax.plot(x_line, y_line, color='red', label=f'Fit: y = {a:.2f} * x^{b:.2f}')
+        ax.text(0.05, 0.95, f'$R^2$ = {r_val**2:.3f}', transform=ax.transAxes,
+                verticalalignment='top', bbox=dict(facecolor='white', alpha=0.5))
+    else:
+        sns.scatterplot(x=x_vals, y=y_vals, label='Original Data', ax=ax)
+        st.warning("Not enough data for regression.")
+
+    prediction_data = st.session_state['predictions'].get(selected_dataset_name, [])
+    if prediction_data:
+        df_preds = pd.DataFrame(prediction_data)
+        if feature in df_preds.columns and target_column in df_preds.columns:
+            sns.scatterplot(
+                data=df_preds,
+                x=feature,
+                y=target_column,
+                marker='X',
+                s=100,
+                color='green',
+                label='Predictions',
+                ax=ax
+            )
+
+    ax.set_xlabel(feature)
+    ax.set_ylabel(target_column)
+    ax.set_title(f'Cost Curve: {feature} vs {target_column}')
+    ax.legend()
+    ax.xaxis.set_major_formatter(FuncFormatter(human_format))
+    ax.yaxis.set_major_formatter(FuncFormatter(human_format))
+    plt.tight_layout()
+    st.pyplot(fig)
+    plt.close()
+
+    with st.expander('Simplified Project List', expanded=True):
+        preds = st.session_state['predictions'][selected_dataset_name]
+        if preds:
+            if st.button('Delete All', key='delete_all'):
+                st.session_state['predictions'][selected_dataset_name] = []
+                to_remove = {fid for fid in st.session_state['processed_excel_files'] if fid.endswith(selected_dataset_name)}
+                for fid in to_remove:
+                    st.session_state['processed_excel_files'].remove(fid)
+                st.rerun()
+
+            for i, p in enumerate(preds):
+                c1, c2 = st.columns([3, 1])
+                c1.write(p['Project Name'])
+                if c2.button('Delete', key=f'del_{i}'):
+                    preds.pop(i)
+                    st.rerun()
+        else:
+            st.write("No predictions yet.")
 
     st.header(f"Prediction Summary based on {clean_name} (Target: {target_column})")
     preds = st.session_state['predictions'][selected_dataset_name]
